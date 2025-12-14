@@ -1,0 +1,22 @@
+
+## Repository Structure
+
+```
+fedora-engineering-workstation/
+├── docs/               # Installation and configuration guides
+├── scripts/            # Automated setup and verification
+├── configs/            # Configuration files (TLP, kind, etc.)
+├── dotfiles/           # Sample shell configs
+├── projects/templates/ # Project starter templates
+└── references/         # Technical bookmarks and resources
+```
+
+---
+
+## Related Repository
+
+**Learning & Career Development:** [engineering-learning-journal](https://github.com/YOUR_USERNAME/engineering-learning-journal)
+
+For personal learning progress, study notes, certifications, and resources, see the companion learning journal repository.
+
+---

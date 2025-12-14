@@ -1,0 +1,32 @@
+[user]
+    name = Your Name
+    email = your.email@example.com
+
+[init]
+    defaultBranch = main
+
+[pull]
+    rebase = true
+
+[color]
+    ui = auto
+
+[alias]
+    st = status
+    co = checkout
+    br = branch
+    ci = commit
+    lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+    last = log -1 HEAD
+    unstage = reset HEAD --
+    amend = commit --amend --no-edit
+
+[core]
+    editor = vim
+    excludesfile = ~/.gitignore_global
+
+[diff]
+    algorithm = histogram
+
+[merge]
+    conflictstyle = diff3
