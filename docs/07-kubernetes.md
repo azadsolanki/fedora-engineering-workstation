@@ -482,6 +482,43 @@ EOF
 
 sudo systemctl restart systemd-resolved
 ```
+### Pods Scheduling on Master Node
+
+**Problem:** Pods are being scheduled on the master/control-plane node instead of only on worker nodes. Pods may be stuck in `ContainerCreating` status on master.
+
+**Cause:** Master node is missing the standard control-plane taint that prevents pod scheduling.
+
+**Verify:**
+```bash
+kubectl describe node <master-node-name> | grep -i taint
+# Should show: node-role.kubernetes.io/control-plane:NoSchedule
+# Problem shows: <none>
+```
+
+**Fix:**
+```bash
+# Add control-plane taint to master
+kubectl taint nodes <master-node-name> node-role.kubernetes.io/control-plane:NoSchedule
+
+# Delete pods stuck on master
+kubectl delete pod --field-selector spec.nodeName=<master-node-name> --all-namespaces
+
+# Or for specific deployment
+kubectl delete pod -l app=<app-label> --field-selector spec.nodeName=<master-node-name>
+
+# Verify - all pods should now be on worker nodes
+kubectl get pods -o wide --all-namespaces
+```
+
+**Related Error:**
+```
+Failed to create pod sandbox: error adding pod to CNI network "cbr0": 
+failed to set bridge addr: "cni0" already has an IP address different from 10.244.0.1/24
+```
+#### Best Practice
+✅ Master/control-plane nodes should be dedicated to cluster management
+✅ User workloads should run exclusively on worker nodes
+✅ Control-plane taint ensures resource isolation and cluster stability
 
 ### Worker Node Issues
 
