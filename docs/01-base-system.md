@@ -67,6 +67,18 @@ Use GNOME Tweaks to:
 - Set up keyboard shortcuts
 - Customize appearance
 
+
+## Tips:
+`sudo` privilege are short lived - 15 min on Fedora and 5 min on Ubuntu. To extend:
+- step 1:
+```bash
+#-- Run the visual sudo editor
+sudo visudo
+```  
+- step 2: Find the line that starts with Defaults. Add timestamp_timeout=60 to it. It should look like this:
+```
+Defaults    env_reset, timestamp_timeout=60
+```
 ## Next Steps
 
 Proceed to [Development Fundamentals](02-development-fundamentals.md)
