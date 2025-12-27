@@ -97,6 +97,7 @@ chmod +x scripts/bootstrap.sh
 - [Observability](docs/09-observability.md) - Prometheus, Grafana
 - [AI/ML Tools](docs/10-ai-ml-tools.md)
 - [IDEs & Editors](docs/11-ides-editors.md)
+- [Browser Privacy](docs/15-browser-privacy.md) - Firefox containers, tracker blocking
 
 ### Reference
 - [Troubleshooting](docs/troubleshooting.md)
