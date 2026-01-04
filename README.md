@@ -52,12 +52,14 @@ chmod +x scripts/bootstrap.sh
 - [x] Base system (Fedora, ThinkPad optimizations)
 - [x] Git with SSH authentication
 - [x] Podman (rootless containers)
-- [x] kubectl & kind (Kubernetes)
+- [x] kubectl, kind & kubeadm (Kubernetes)
 - [x] Java 21 (for JVM tools)
 - [x] Python 3.11 with UV
 - [x] Apache Spark (local + Podman)
 - [x] VS Code with extensions
 - [x] Google Cloud SDK
+- [x] dbt (data build tool)
+- [x] Trino
 
 ### 🚧 In Progress
 - [ ] Apache Kafka
@@ -65,8 +67,6 @@ chmod +x scripts/bootstrap.sh
 
 ### 📝 Planned
 - [ ] Apache Iceberg
-- [ ] dbt (data build tool)
-- [ ] Trino
 - [ ] Helm & ArgoCD
 - [ ] Prometheus & Grafana
 - [ ] MinIO (local S3)
@@ -197,4 +197,4 @@ MIT License - see [LICENSE](LICENSE)
 
 *Documentation structure assisted by AI for completeness and organization.*
 
-Last updated: December 2025
+Last updated: January 2026
