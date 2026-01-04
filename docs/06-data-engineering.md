@@ -151,24 +151,67 @@ SQL-based transformation framework for analytics.
 ### Installation
 
 ```bash
-uv pip install dbt-core dbt-bigquery dbt-postgres
+cd ~/data-projects
+uv init dbt-project
+cd dbt-project
+uv add dbt-core dbt-trino dbt-bigquery
 ```
 
-### Basic Usage
+### Configure Connection
 
 ```bash
-# Initialize project
-dbt init my_project
+# Create profile
+mkdir -p ~/.dbt
 
-# Run transformations
-dbt run
+# Get Trino NodePort
+TRINO_PORT=$(kubectl get svc trino -o jsonpath='{.spec.ports[0].nodePort}')
 
-# Test data quality
-dbt test
+cat > ~/.dbt/profiles.yml << EOF
+my_project:
+  target: dev
+  outputs:
+    dev:
+      type: trino
+      method: none
+      user: $(whoami)
+      host: localhost
+      port: ${TRINO_PORT}
+      database: memory
+      schema: default
+      threads: 4
+      http_scheme: http
+EOF
+```
+### Create Project 
 
-# Generate documentation
-dbt docs generate
-dbt docs serve
+```bash
+# Create structure
+mkdir -p models/example
+
+# Sample model
+cat > models/example/customers.sql << 'EOF'
+{{ config(materialized='table') }}
+select 1 as id, 'John' as name
+union all
+select 2 as id, 'Jane' as name
+EOF
+
+# Project config
+cat > dbt_project.yml << 'EOF'
+name: 'my_project'
+version: '1.0.0'
+profile: 'my_project'
+model-paths: ["models"]
+EOF
+```
+
+### test
+```bash
+uv run dbt debug  # Test connection
+uv run dbt run    # Run models
+uv run dbt test   # Run tests
+uv run dbt docs generate  # Generate docs
+uv run dbt docs serve     # View docs
 ```
 
 ### Typical Workflow
@@ -182,13 +225,14 @@ dbt docs serve
 
 - BigQuery (GCP)
 - PostgreSQL (local dev)
+- Trino
 - Spark (via dbt-spark adapter)
 
 **Resources:**
 - [Official dbt Docs](https://docs.getdbt.com/)
 - [dbt Best Practices](https://docs.getdbt.com/guides/best-practices)
 
-**Status:** 📝 Planned
+**Status:** ✅ Completed
 
 ---
 
@@ -202,18 +246,59 @@ Distributed SQL query engine for big data.
 - Fast analytics on large datasets
 - SQL interface to everything
 
-### Installation (Podman)
+Prerequisites
+
+- Kubernetes cluster running (see [Kubernetes Setup](07-kubernetes.md)])
+- Helm installed
+- kubectl configured
+
+### Installation (Kubernetes)
 
 ```bash
-# Coming soon - Trino server setup
-```
+# Add Helm repo
+helm repo add trino https://trinodb.github.io/charts/
+helm repo update
 
+# Create config with memory catalog
+cat > trino-values.yaml << 'EOF'
+server:
+  workers: 1
+catalogs:
+  memory: |
+    connector.name=memory
+  tpch: |
+    connector.name=tpch
+service:
+  type: NodePort
+EOF
+
+# Install
+helm install trino trino/trino -f trino-values.yaml
+
+# Wait for ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=trino --timeout=300s
+
+# Get access
+kubectl get svc trino
+```
+### Access
+```bash
+# Via kubectl
+kubectl exec -it deployment/trino-coordinator -- trino
+
+# Inside Trino CLI:
+SHOW CATALOGS;
+USE memory.default;
+SHOW TABLES;
+SELECT * FROM your_table;
+quit;
+```
 **Use Cases:**
 - Query Iceberg tables
 - Federated queries across data sources
 - Interactive analytics
 
-**Status:** 📝 Planned
+**Status:** ✅ Completed
 
 ---
 
