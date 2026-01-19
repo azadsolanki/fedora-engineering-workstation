@@ -677,6 +677,202 @@ sudo kubeadm reset -f
 sudo rm -rf $HOME/.kube /etc/kubernetes
 ```
 
+
+
+### Certificate and Join Issues
+
+#### Certificate Error When Joining Worker
+
+**Symptom:**
+```
+x509: certificate is valid for 10.96.0.1, 10.177.68.134, not 192.168.4.73
+```
+
+**Root Cause:** Master node IP changed after cluster initialization (network reconfiguration, DHCP renewal, or exposing to internet), but API server certificate still has old IP.
+
+**Fix:**
+
+```bash
+# On master - regenerate certificate with current IP
+sudo tee /tmp/kubeadm-config.yaml > /dev/null << 'EOF'
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+apiServer:
+  certSANs:
+  - "192.168.4.73"        # Current master IP
+  - "127.0.0.1"
+  - "10.96.0.1"
+  - "fedora"              # Hostname
+networking:
+  podSubnet: "10.244.0.0/16"
+EOF
+
+# Remove old certificate
+sudo rm /etc/kubernetes/pki/apiserver.{crt,key}
+
+# Regenerate
+sudo kubeadm init phase certs apiserver --config /tmp/kubeadm-config.yaml
+
+# Restart kubelet
+sudo systemctl restart kubelet
+sleep 30
+
+# Verify
+kubectl get nodes
+```
+
+---
+
+#### Join Command Shows 127.0.0.1
+
+**Symptom:** `kubeadm token create --print-join-command` returns `127.0.0.1:6443`
+
+**Root Cause:** API server advertise-address set to `0.0.0.0` or `127.0.0.1` instead of actual master IP.
+
+**Quick Fix:** Manually replace IP in join command
+
+```bash
+# Change this:
+kubeadm join 127.0.0.1:6443 --token xxx...
+
+# To this (use actual master IP):
+kubeadm join 192.168.4.73:6443 --token xxx...
+```
+
+**Permanent Fix:**
+
+```bash
+# On master - edit API server manifest
+sudo nano /etc/kubernetes/manifests/kube-apiserver.yaml
+
+# Find and change:
+- --advertise-address=0.0.0.0
+# To:
+- --advertise-address=192.168.4.73
+
+# API server auto-restarts (wait 30 seconds)
+# Future join commands will show correct IP
+```
+
+---
+
+#### CRI-O Socket Not Found
+
+**Symptom:**
+```
+dial unix /var/run/crio/crio.sock: connect: no such file or directory
+```
+
+**Root Cause:** CRI-O not installed or not running on worker node.
+
+**Fix:**
+
+```bash
+# On worker node
+sudo dnf install -y cri-o1.31
+sudo systemctl enable --now crio
+sudo systemctl status crio
+
+# Verify socket exists
+ls -la /var/run/crio/crio.sock
+
+# Then retry join with --cri-socket flag
+```
+
+---
+
+### Cluster Management Issues
+
+#### Pods Stuck in Terminating
+
+**Symptom:** Pods show "Terminating" status for extended time
+
+**Root Cause:** Node unreachable, Kubernetes can't delete pods gracefully.
+
+**Fix:**
+
+```bash
+# Force delete specific pod
+kubectl delete pod <pod-name> --force --grace-period=0 -n <namespace>
+
+# Delete all terminating pods
+kubectl get pods -A | grep Terminating | \
+  awk '{print $2 " -n " $1}' | \
+  xargs -l kubectl delete pod --force --grace-period=0
+```
+
+---
+
+#### Worker VM Completely Broken
+
+**Symptom:** Cannot access worker, password reset failed, join repeatedly fails.
+
+**Solution:** Delete and recreate worker VM
+
+```bash
+# On master - drain node first
+kubectl drain worker1 --ignore-daemonsets --delete-emptydir-data --force
+kubectl delete node worker1
+
+# On host - delete VM
+virsh destroy worker1
+virsh undefine worker1 --remove-all-storage
+
+# Recreate fresh worker VM (see "Create Worker Node VM" section)
+# Rejoin to cluster with fresh credentials
+```
+
+**Prevention:** Use SSH keys instead of passwords
+
+```bash
+# On master/workstation
+ssh-keygen -t ed25519 -f ~/.ssh/k8s_workers
+ssh-copy-id -i ~/.ssh/k8s_workers.pub azad@worker1-ip
+
+# Future logins
+ssh -i ~/.ssh/k8s_workers azad@worker1-ip
+```
+
+---
+
+### Diagnostic Commands
+
+```bash
+# Check API server certificate IPs
+sudo openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text | \
+  grep -A1 "Subject Alternative Name"
+
+# Check API server advertise address
+sudo grep advertise-address /etc/kubernetes/manifests/kube-apiserver.yaml
+
+# Check master IP addresses
+ip addr show | grep "inet "
+
+# Check worker CRI-O status
+sudo systemctl status crio
+sudo crictl info
+
+# Check kubelet status
+sudo systemctl status kubelet
+sudo journalctl -u kubelet -f
+
+# Verify network connectivity
+ping <master-ip>
+telnet <master-ip> 6443
+```
+
+---
+
+### Common Root Causes Summary
+
+| Issue | Root Cause | Prevention |
+|-------|------------|------------|
+| **Certificate errors** | Master IP changed | Use static IP or include all IPs in cert SANs |
+| **127.0.0.1 join** | advertise-address=0.0.0.0 | Set specific IP in kubeadm init |
+| **CRI-O socket missing** | CRI-O not installed | Verify CRI-O running before join |
+| **Wrong hostname** | Hostname not set before join | Set hostname before cluster join |
+| **Pods terminating** | Node unreachable | Drain node before removing |
+| **Forgotten password** | No SSH key setup | Always use SSH keys for VMs |
 ---
 
 ## kubectl Basics
