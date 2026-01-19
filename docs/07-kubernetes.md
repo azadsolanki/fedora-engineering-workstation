@@ -2,6 +2,40 @@
 
 Local Kubernetes setup with kubectl, kind, and kubeadm.
 
+**Quick Links:** [🚀 kind Setup](#option-1-kubectl--kind-already-installed) | [🏗️ Multi-Node Cluster](#multi-node-cluster-with-vms) | [🔧 Troubleshooting](#troubleshooting) | [📖 kubectl Commands](#kubectl-basics)
+
+---
+
+## Table of Contents
+
+### Quick Start
+- [Overview](#overview)
+- [Option 1: kubectl + kind](#option-1-kubectl--kind-already-installed) - Recommended for learning
+- [Option 2: kubeadm](#option-2-kubeadm-full-cluster-setup) - Production-like setup
+
+### Setup Guides
+**Single-Node:**
+- [Prerequisites](#prerequisites) | [System Config](#system-configuration) | [Install Runtime](#install-container-runtime-cri-o) | [Install K8s](#install-kubernetes) | [Initialize](#initialize-cluster) | [Pod Network](#install-pod-network-flannel) | [Verify](#verify-cluster)
+
+**Multi-Node:**
+- [VM Prerequisites](#prerequisites-1) | [Download ISO](#download-fedora-iso) | [Create Worker](#create-worker-node-vm) | [Install Fedora](#install-fedora-on-worker-node) | [Get IP](#get-worker-node-ip) | [Configure Worker](#configure-worker-node-for-kubernetes) | [Join Cluster](#join-worker-to-cluster) | [Verify](#verify-multi-node-cluster) | [Add More Workers](#add-additional-workers) | [VM Management](#vm-management-commands)
+
+### Troubleshooting
+**Common Issues:**
+- [CoreDNS](#coredns-crashloopbackoff) | [Pod Scheduling on Master](#pods-scheduling-on-master-node)
+
+**Worker Nodes:**
+- [Wrong Hostname](#worker-has-wrong-hostname) | [Cannot Join](#cannot-join---files-already-exist) | [Network Issues](#worker-cannot-reach-master) | [No IP](#worker-not-getting-ip) | [LibVirt Issues](#libvirt-network-issues) | [Forgot Password](#forgot-worker-vm-password)
+
+**Certificates:**
+- [Cert Error](#certificate-error-when-joining-worker) | [127.0.0.1 Join](#join-command-shows-127001) | [CRI-O Missing](#cri-o-socket-not-found)
+
+**Cluster Management:**
+- [Terminating Pods](#pods-stuck-in-terminating) | [Broken VM](#worker-vm-completely-broken) | [Diagnostics](#diagnostic-commands) | [Root Causes](#common-root-causes-summary)
+
+### Usage & Reference
+- [kubectl Basics](#kubectl-basics) | [Examples](#example-deployments) | [Cluster Management](#cluster-management) | [Comparison](#comparison-kind-vs-kubeadm) | [Resources](#resources) | [Next Steps](#next-steps)
+
 ---
 
 ## Overview
@@ -13,7 +47,7 @@ Two approaches for Kubernetes on Fedora:
 
 ---
 
-## Option 1: kubectl + kind (Already Installed)
+## Option 1: kubectl + kind 
 
 ### Installation
 
@@ -54,6 +88,8 @@ kubectl get pods -A
 ```bash
 kind delete cluster --name dev-cluster
 ```
+
+[⬆️ Back to Top](#table-of-contents)
 
 ---
 
@@ -192,8 +228,9 @@ kubectl get pods
 kubectl delete pod test
 ```
 
----
+[⬆️ Back to Top](#table-of-contents)
 
+---
 
 ## Multi-Node Cluster with VMs
 
@@ -266,7 +303,7 @@ virt-manager
 1. **Software Selection:** Fedora Server Edition
 2. **Network & Hostname:**
    - **Toggle network ON** ✅ (Very important!)
-   - Hostname: `worker1`
+   - **Hostname:** `worker1` ✅ (Set this to avoid hostname issues!)
 3. **Root Password:**
    - Enable root account
    - Set password and write it down
@@ -275,6 +312,8 @@ virt-manager
    - Username: `azad` (or your preference)
    - Set password and write it down
    - Check "Make this user administrator"
+
+**Important:** Setting the hostname during installation prevents the "localhost.localdomain" issue later!
 
 ### Get Worker Node IP
 
@@ -371,7 +410,8 @@ ssh azad@192.168.122.100
 # Become root
 sudo -i
 
-# IMPORTANT: Add --cri-socket flag to join command
+# IMPORTANT: If join command shows 127.0.0.1, replace with actual master IP!
+# Add --cri-socket flag to join command
 kubeadm join <MASTER_IP>:6443 \
   --token <TOKEN> \
   --discovery-token-ca-cert-hash sha256:<HASH> \
@@ -418,8 +458,8 @@ sudo virt-install \
   --graphics vnc \
   --noautoconsole
 
-# Install Fedora (set hostname: worker2)
-# Configure Kubernetes (same steps)
+# Install Fedora (IMPORTANT: set hostname to "worker2" during installation!)
+# Configure Kubernetes (same steps as worker1)
 # Generate new token on master
 # Join to cluster
 ```
@@ -456,9 +496,13 @@ virsh console worker1
 # (Exit with Ctrl+])
 ```
 
+[⬆️ Back to Top](#table-of-contents)
+
 ---
 
 ## Troubleshooting
+
+Common issues when setting up and managing Kubernetes clusters on Fedora.
 
 ### CoreDNS CrashLoopBackOff
 
@@ -482,6 +526,9 @@ EOF
 
 sudo systemctl restart systemd-resolved
 ```
+
+---
+
 ### Pods Scheduling on Master Node
 
 **Problem:** Pods are being scheduled on the master/control-plane node instead of only on worker nodes. Pods may be stuck in `ContainerCreating` status on master.
@@ -515,16 +562,21 @@ kubectl get pods -o wide --all-namespaces
 Failed to create pod sandbox: error adding pod to CNI network "cbr0": 
 failed to set bridge addr: "cni0" already has an IP address different from 10.244.0.1/24
 ```
-#### Best Practice
-✅ Master/control-plane nodes should be dedicated to cluster management
-✅ User workloads should run exclusively on worker nodes
-✅ Control-plane taint ensures resource isolation and cluster stability
+
+**Best Practice:**
+- ✅ Master/control-plane nodes should be dedicated to cluster management
+- ✅ User workloads should run exclusively on worker nodes
+- ✅ Control-plane taint ensures resource isolation and cluster stability
+
+---
 
 ### Worker Node Issues
 
 #### Worker Has Wrong Hostname
 
 **Problem:** Node shows as `localhost.localdomain` instead of `worker1`
+
+**Prevention:** Set hostname during Fedora installation in "Network & Hostname" settings **before** joining cluster.
 
 **Fix:**
 
@@ -544,6 +596,8 @@ sudo rm -rf /etc/kubernetes/ /var/lib/kubelet/ ~/.kube/
 # Then rejoin with correct hostname
 ```
 
+---
+
 #### Cannot Join - Files Already Exist
 
 **Problem:**
@@ -562,6 +616,8 @@ sudo systemctl restart kubelet
 
 # Then rejoin
 ```
+
+---
 
 #### Worker Cannot Reach Master
 
@@ -585,6 +641,8 @@ sudo systemctl disable --now firewalld
 ping <MASTER_IP>
 telnet <MASTER_IP> 6443
 ```
+
+---
 
 #### Worker Not Getting IP
 
@@ -612,6 +670,8 @@ virsh start worker1
 virsh domifaddr worker1
 ```
 
+---
+
 #### LibVirt Network Issues
 
 **Problem:** `virsh` commands fail or network not found
@@ -626,7 +686,7 @@ echo 'export LIBVIRT_DEFAULT_URI="qemu:///system"' >> ~/.bashrc
 # Create default network if missing
 cat > /tmp/default-network.xml << 'EOF'
 <network>
-  <n>default</n>
+  <name>default</name>
   <bridge name="virbr0"/>
   <forward mode="nat"/>
   <ip address="192.168.122.1" netmask="255.255.255.0">
@@ -641,6 +701,8 @@ sudo virsh net-define /tmp/default-network.xml
 sudo virsh net-start default
 sudo virsh net-autostart default
 ```
+
+---
 
 #### Forgot Worker VM Password
 
@@ -670,14 +732,7 @@ exit
 # Wait for reboot (slow - SELinux relabeling)
 ```
 
-### Reset Cluster
-
-```bash
-sudo kubeadm reset -f
-sudo rm -rf $HOME/.kube /etc/kubernetes
-```
-
-
+---
 
 ### Certificate and Join Issues
 
@@ -870,9 +925,21 @@ telnet <master-ip> 6443
 | **Certificate errors** | Master IP changed | Use static IP or include all IPs in cert SANs |
 | **127.0.0.1 join** | advertise-address=0.0.0.0 | Set specific IP in kubeadm init |
 | **CRI-O socket missing** | CRI-O not installed | Verify CRI-O running before join |
-| **Wrong hostname** | Hostname not set before join | Set hostname before cluster join |
+| **Wrong hostname** | Hostname not set before join | Set hostname during Fedora installation |
 | **Pods terminating** | Node unreachable | Drain node before removing |
 | **Forgotten password** | No SSH key setup | Always use SSH keys for VMs |
+
+---
+
+### Reset Cluster
+
+```bash
+sudo kubeadm reset -f
+sudo rm -rf $HOME/.kube /etc/kubernetes
+```
+
+[⬆️ Back to Top](#table-of-contents)
+
 ---
 
 ## kubectl Basics
@@ -973,6 +1040,8 @@ Apply:
 kubectl apply -f nginx-deployment.yaml
 ```
 
+[⬆️ Back to Top](#table-of-contents)
+
 ---
 
 ## Cluster Management
@@ -1024,6 +1093,8 @@ sudo ETCDCTL_API=3 etcdctl snapshot save /tmp/etcd-backup.db \
 
 - [Cloud Native Tools](08-cloud-native-tools.md)
 - [Observability](09-observability.md)
+
+[⬆️ Back to Top](#table-of-contents)
 
 ---
 
