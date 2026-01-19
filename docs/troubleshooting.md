@@ -247,6 +247,201 @@ kubectl config use-context kind-dev-cluster
 kubectl cluster-info
 ```
 
+### Kubeadm Cluster Fails on Different Networks
+
+**Problem:** `kubectl` commands timeout when connecting to kubeadm cluster from different WiFi networks (library, cafe, friend's house). Error: `dial tcp 192.168.x.x:6443: i/o timeout`
+
+**Why This Happens:**
+
+Kubeadm clusters bind to your laptop's network IP address during initialization. When you switch networks:
+1. Your laptop gets a new IP address (e.g., home: `192.168.4.73` → library: `10.0.50.25`)
+2. The kubeconfig still points to the old IP address
+3. API server certificates are tied to the old IP address
+4. The cluster becomes unreachable because that IP doesn't exist on the new network
+
+**Solution - Make Cluster Network-Agnostic:**
+
+Save this as `make-kubeadm-portable.sh`:
+```bash
+#!/bin/bash
+# Makes kubeadm cluster work on any network by using localhost
+
+set -e
+
+echo "=== Making kubeadm cluster portable ==="
+
+# Backup certificates
+echo "1. Backing up certificates..."
+BACKUP_DIR="/etc/kubernetes/pki.backup.$(date +%Y%m%d_%H%M%S)"
+sudo cp -r /etc/kubernetes/pki "$BACKUP_DIR"
+echo "   Backup saved to: $BACKUP_DIR"
+
+# Get current IP for backwards compatibility
+CURRENT_IP=$(ip -4 addr show | grep "inet " | grep -v 127.0.0.1 | head -1 | awk '{print $2}' | cut -d/ -f1)
+echo "2. Current IP detected: $CURRENT_IP"
+
+# Create kubeadm config
+echo "3. Creating kubeadm config..."
+cat <<EOF | sudo tee /tmp/kubeadm-apiserver-portable.yaml
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+apiServer:
+  certSANs:
+  - "127.0.0.1"
+  - "localhost"
+  - "$CURRENT_IP"
+  extraArgs:
+    advertise-address: "0.0.0.0"
+    bind-address: "0.0.0.0"
+EOF
+
+# Delete old API server certs
+echo "4. Removing old API server certificates..."
+sudo rm -f /etc/kubernetes/pki/apiserver.crt
+sudo rm -f /etc/kubernetes/pki/apiserver.key
+
+# Regenerate certificates with localhost
+echo "5. Regenerating certificates with localhost support..."
+sudo kubeadm init phase certs apiserver --config=/tmp/kubeadm-apiserver-portable.yaml
+
+# Update API server manifest
+echo "6. Updating API server configuration..."
+if grep -q "advertise-address" /etc/kubernetes/manifests/kube-apiserver.yaml; then
+    sudo sed -i 's/--advertise-address=[0-9.]\+/--advertise-address=0.0.0.0/' /etc/kubernetes/manifests/kube-apiserver.yaml
+else
+    # Add advertise-address if it doesn't exist
+    sudo sed -i '/- kube-apiserver/a\    - --advertise-address=0.0.0.0' /etc/kubernetes/manifests/kube-apiserver.yaml
+fi
+
+# Restart kubelet
+echo "7. Restarting kubelet..."
+sudo systemctl restart kubelet
+
+# Wait for API server to restart
+echo "8. Waiting for API server to restart (60 seconds)..."
+sleep 60
+
+# Update kubeconfig to use localhost
+echo "9. Updating kubeconfig to use localhost..."
+kubectl config set-cluster kubernetes --server=https://127.0.0.1:6443
+
+# Verify setup
+echo ""
+echo "=== Verification ==="
+
+echo "API server listening on:"
+sudo ss -tlnp | grep :6443 | head -1
+
+echo ""
+echo "Kubeconfig server:"
+kubectl config view --minify | grep server:
+
+echo ""
+echo "Testing kubectl (this may take a moment)..."
+if kubectl get nodes &>/dev/null; then
+    echo "✅ SUCCESS: Cluster is accessible!"
+    kubectl get nodes
+else
+    echo "❌ FAILED: Cluster not accessible yet. Wait 30 more seconds and try: kubectl get nodes"
+fi
+
+echo ""
+echo "=== Setup Complete ==="
+echo "Your cluster now works on ANY network!"
+echo "Backup location: $BACKUP_DIR"
+```
+
+**Run the script:**
+```bash
+chmod +x make-kubeadm-portable.sh
+./make-kubeadm-portable.sh
+```
+
+**Verify it works:**
+```bash
+# Check kubeconfig uses localhost
+kubectl config view --minify | grep server:
+# Should show: https://127.0.0.1:6443
+
+# Test kubectl
+kubectl get nodes
+kubectl get pods -A
+```
+
+**Rollback (If Something Goes Wrong):**
+```bash
+#!/bin/bash
+# Rollback script - restore original certificates
+
+echo "=== Rolling back kubeadm changes ==="
+
+# Find most recent backup
+BACKUP_DIR=$(ls -td /etc/kubernetes/pki.backup.* 2>/dev/null | head -1)
+
+if [ -z "$BACKUP_DIR" ]; then
+    echo "❌ No backup found!"
+    echo "Available backups:"
+    ls -ld /etc/kubernetes/pki.backup.* 2>/dev/null || echo "None"
+    exit 1
+fi
+
+echo "Found backup: $BACKUP_DIR"
+read -p "Restore from this backup? (yes/no): " confirm
+
+if [ "$confirm" != "yes" ]; then
+    echo "Rollback cancelled"
+    exit 0
+fi
+
+# Restore certificates
+echo "1. Restoring certificates..."
+sudo rm -rf /etc/kubernetes/pki
+sudo cp -r "$BACKUP_DIR" /etc/kubernetes/pki
+
+# Restore kubeconfig (you may need to update this to your old IP)
+echo "2. Update kubeconfig to your current IP or old IP:"
+CURRENT_IP=$(ip -4 addr show | grep "inet " | grep -v 127.0.0.1 | head -1 | awk '{print $2}' | cut -d/ -f1)
+echo "   Current IP: $CURRENT_IP"
+read -p "   Enter API server IP to use [$CURRENT_IP]: " API_IP
+API_IP=${API_IP:-$CURRENT_IP}
+
+kubectl config set-cluster kubernetes --server=https://$API_IP:6443
+
+# Restart kubelet
+echo "3. Restarting kubelet..."
+sudo systemctl restart kubelet
+
+echo "4. Waiting for API server (60 seconds)..."
+sleep 60
+
+# Test
+echo "5. Testing connection..."
+if kubectl get nodes &>/dev/null; then
+    echo "✅ Rollback successful!"
+    kubectl get nodes
+else
+    echo "⚠️  Cluster not responding yet. Try manually:"
+    echo "   kubectl get nodes"
+fi
+
+echo ""
+echo "=== Rollback Complete ==="
+```
+
+**Save rollback as:**
+```bash
+chmod +x rollback-kubeadm-portable.sh
+./rollback-kubeadm-portable.sh
+```
+
+
+
+**Notes:**
+- This is a one-time setup - after running the script, your cluster works everywhere
+- `127.0.0.1` (localhost) is the same on every network
+- Kubeadm is designed for production servers with static IPs, not laptops
+- For portable development clusters, Kind/Minikube are better choices
+
 ## Git Issues
 
 ### SSH Key Not Working
