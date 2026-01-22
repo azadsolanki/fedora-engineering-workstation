@@ -385,6 +385,8 @@ systemctl disable --now firewalld
 
 # 10. Enable kubelet
 systemctl enable kubelet
+# Ensure services enabled
+systemctl enable containerd
 
 # 11. Reboot (for swap disable to take full effect)
 reboot
