@@ -434,13 +434,47 @@ chmod +x rollback-kubeadm-portable.sh
 ./rollback-kubeadm-portable.sh
 ```
 
+### Pods Stuck in ContainerCreating - Missing CNI Binaries
 
+### Issue Summary
+**Symptom**: Pods stuck in `ContainerCreating` status on worker1  
+**Error**: `no CNI configuration file in /etc/cni/net.d/`  
+**Root Cause**: CNI plugin binaries missing from `/opt/cni/bin/`  
+**Impact**: All pods on worker1 failed to start  
 
-**Notes:**
-- This is a one-time setup - after running the script, your cluster works everywhere
-- `127.0.0.1` (localhost) is the same on every network
-- Kubeadm is designed for production servers with static IPs, not laptops
-- For portable development clusters, Kind/Minikube are better choices
+### Diagnosis
+```bash
+kubectl describe pod <pod>              # Get error
+virsh console worker1
+sudo systemctl status containerd         # Running? If not, start it
+ls -la /etc/cni/net.d/                  # Config exists?
+ls -la /opt/cni/bin/                    # Binaries exist? ← KEY CHECK
+# Should see: bridge, dhcp, flannel, host-local, loopback, macvlan, portmap, etc.
+```
+
+### Fix
+```bash
+# On worker node:
+sudo dnf install containernetworking-plugins -y
+sudo cp /usr/libexec/cni/* /opt/cni/bin/
+sudo systemctl restart containerd kubelet
+exit
+
+# From master:
+kubectl delete pod <stuck-pods>
+```
+
+### Prevention
+```bash
+# On all worker nodes during setup:
+sudo dnf install containernetworking-plugins -y
+sudo systemctl enable containerd kubelet
+```
+
+### Key Takeaway
+CNI config file ≠ CNI binaries. Flannel only provides `flannel` binary - install `containernetworking-plugins` for the rest.
+
+---
 
 ## Git Issues
 
