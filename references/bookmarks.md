@@ -57,6 +57,9 @@ Quick reference links for documentation and resources.
 - [CNCF Blog](https://www.cncf.io/blog/)
 - [Confluent Blog](https://www.confluent.io/blog/) - Kafka
 - [Databricks Blog](https://www.databricks.com/blog)
+- [Open AI Engineering](https://openai.com/news/engineering/)
+- [Spotify Engineer](https://engineering.atspotify.com/)
+- [Uber Engineering](https://www.uber.com/us/en/blog/engineering/)
 
 ## GitHub Repos
 
