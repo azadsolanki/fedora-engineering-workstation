@@ -60,6 +60,8 @@ chmod +x scripts/bootstrap.sh
 - [x] Zed Editor
 - [x] Claude Code (AI coding assistant)
 - [x] Google ADK (Agent Development Kit)
+- [x] MCP (Model Context Protocol)
+- [x] Ollama (local LLMs)
 - [x] Google Cloud SDK
 - [x] dbt (data build tool)
 - [x] Trino
@@ -103,6 +105,8 @@ chmod +x scripts/bootstrap.sh
 - [Zed Editor](docs/14-zed-editor.md)
 - [Claude Code](docs/16-claude-code.md)
 - [Agent Development Kit (ADK)](docs/17-adk.md)
+- [Model Context Protocol (MCP)](docs/18-mcp.md)
+- [Ollama (Local LLMs)](docs/19-ollama.md)
 - [Browser Privacy](docs/15-browser-privacy.md) - Firefox containers, tracker blocking
 
 ### Reference
