@@ -59,6 +59,7 @@ chmod +x scripts/bootstrap.sh
 - [x] VS Code with extensions
 - [x] Zed Editor
 - [x] Claude Code (AI coding assistant)
+- [x] Google ADK (Agent Development Kit)
 - [x] Google Cloud SDK
 - [x] dbt (data build tool)
 - [x] Trino
@@ -100,7 +101,8 @@ chmod +x scripts/bootstrap.sh
 - [AI/ML Tools](docs/10-ai-ml-tools.md)
 - [IDEs & Editors](docs/11-ides-editors.md)
 - [Zed Editor](docs/14-zed-editor.md)
-- [Claude Code Setup](docs/read.md)
+- [Claude Code](docs/16-claude-code.md)
+- [Agent Development Kit (ADK)](docs/17-adk.md)
 - [Browser Privacy](docs/15-browser-privacy.md) - Firefox containers, tracker blocking
 
 ### Reference
