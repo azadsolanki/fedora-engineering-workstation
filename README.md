@@ -57,6 +57,8 @@ chmod +x scripts/bootstrap.sh
 - [x] Python 3.11 with UV
 - [x] Apache Spark (local + Podman)
 - [x] VS Code with extensions
+- [x] Zed Editor
+- [x] Claude Code (AI coding assistant)
 - [x] Google Cloud SDK
 - [x] dbt (data build tool)
 - [x] Trino
@@ -97,6 +99,8 @@ chmod +x scripts/bootstrap.sh
 - [Observability](docs/09-observability.md) - Prometheus, Grafana
 - [AI/ML Tools](docs/10-ai-ml-tools.md)
 - [IDEs & Editors](docs/11-ides-editors.md)
+- [Zed Editor](docs/14-zed-editor.md)
+- [Claude Code Setup](docs/read.md)
 - [Browser Privacy](docs/15-browser-privacy.md) - Firefox containers, tracker blocking
 
 ### Reference
