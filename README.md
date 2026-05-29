@@ -72,7 +72,7 @@ chmod +x scripts/bootstrap.sh
 
 ### 📝 Planned
 - [ ] Apache Iceberg
-- [ ] Helm & ArgoCD
+- [x] Helm & ArgoCD
 - [ ] Prometheus & Grafana
 - [ ] MinIO (local S3)
 
@@ -95,7 +95,7 @@ chmod +x scripts/bootstrap.sh
 
 ### Infrastructure
 - [Kubernetes](docs/07-kubernetes.md)
-- [Cloud Native Tools](docs/08-cloud-native-tools.md) - Helm, ArgoCD
+- [Cloud Native Tools](docs/08-cloud-native-tools.md) - Helm, ArgoCD (GitOps)
 - [Databases](docs/12-databases.md) - PostgreSQL, Redis, MinIO
 
 ### Observability & Development
